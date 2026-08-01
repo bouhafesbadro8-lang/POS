@@ -4,13 +4,16 @@ import { ID } from 'appwrite';
 import ProductForm from './components/ProductForm';
 import Cart from './components/Cart';
 import Inventory from './components/Inventory';
-import SalesHistory from './components/SalesHistory'; // 👈 استيراد مكون الأرشيف
+import SalesHistory from './components/SalesHistory';
 
 function App() {
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
   const [loadingCheckout, setLoadingCheckout] = useState(false);
-  const [salesRefresh, setSalesRefresh] = useState(0); // trigger لتحديث الأرشيف تلقائياً
+  const [salesRefresh, setSalesRefresh] = useState(0);
+  
+  // تبويب محلي للشاشات الصغيرة (الهواتف)
+  const [activeTab, setActiveTab] = useState('cart'); // 'cart' | 'inventory' | 'history'
 
   const DATABASE_ID = '6a6df9bc0037d08df2c3';
   const PRODUCTS_COLLECTION_ID = 'products';
@@ -81,7 +84,6 @@ function App() {
       const itemsSummary = cart.map(item => `${item.name} (${item.quantity}x)`).join(', ');
       const totalAmount = parseFloat(cart.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(2));
 
-      // تسجيل الفاتورة في جدول sales
       await databases.createDocument(
         DATABASE_ID,
         SALES_COLLECTION_ID,
@@ -95,68 +97,109 @@ function App() {
 
       setCart([]);
       fetchProducts();
-      setSalesRefresh(prev => prev + 1); // 👈 تحديث أرشيف الفواتير فورياً
+      setSalesRefresh(prev => prev + 1);
 
       if (zeroStockItems.length > 0) {
-        alert(`تمت عملية البيع وحفظ الفاتورة بنجاح! ✨\n\n⚠️ تنبيه: المنتجات التالية أصبحت الآن 0 في المخزن:\n- ${zeroStockItems.join('\n- ')}`);
+        alert(`تمت عملية البيع بنجاح! ✨\n\n⚠️ منتجات أصبحت 0 بالمخزن:\n- ${zeroStockItems.join('\n- ')}`);
       } else {
-        alert('تمت الفاتورة وحفظها في الأرشيف بنجاح! ✨');
+        alert('تمت الفاتورة بنجاح! ✨');
       }
 
     } catch (error) {
-      console.error("خطأ أثناء معالجة الفاتورة:", error);
-      alert('حدث خطأ! تأكد من إعدادات جدول sales.');
+      console.error("خطأ الفاتورة:", error);
+      alert('حدث خطأ أثناء معالجة الفاتورة.');
     } finally {
       setLoadingCheckout(false);
     }
   };
 
+  // إجمالي عدد العناصر بالسلة للشارة (Badge)
+  const cartItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans" dir="rtl">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 lg:pb-6" dir="rtl">
       {/* Header */}
-      <header className="bg-white border-b border-slate-100 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-black text-indigo-600 flex items-center gap-2">
+      <header className="bg-white border-b border-slate-100 sticky top-0 z-20 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex justify-between items-center">
+          <h1 className="text-lg sm:text-xl font-black text-indigo-600 flex items-center gap-2">
             <span>⚡</span> POS Express
           </h1>
-          <span className="text-xs bg-emerald-50 text-emerald-600 border border-emerald-100 px-3 py-1.5 rounded-full font-medium">
-            Appwrite Cloud Active
+          <span className="text-[11px] sm:text-xs bg-emerald-50 text-emerald-600 border border-emerald-100 px-2.5 py-1 rounded-full font-medium">
+            متصل بالسحابة ☁️
           </span>
         </div>
       </header>
 
-      {/* Main Container */}
-      <main className="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Cart Side */}
-        <div className="lg:col-span-5 h-[calc(100vh-120px)] sticky top-24">
-          <Cart
-            cart={cart}
-            products={products}
-            addToCart={addToCart}
-            updateCartQuantity={updateCartQuantity}
-            removeFromCart={removeFromCart}
-            handleCheckout={handleCheckout}
-            loadingCheckout={loadingCheckout}
-          />
+      {/* Navigation Tabs for Mobile Only */}
+      <div className="lg:hidden bg-white border-b border-slate-200 px-3 py-2 sticky top-[57px] z-10 flex gap-2">
+        <button
+          onClick={() => setActiveTab('cart')}
+          className={`flex-1 py-2 text-xs font-bold rounded-xl transition flex justify-center items-center gap-1.5 ${
+            activeTab === 'cart' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'bg-slate-100 text-slate-600'
+          }`}
+        >
+          <span>🛒 السلة</span>
+          {cartItemsCount > 0 && (
+            <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.2 rounded-full">
+              {cartItemsCount}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('inventory')}
+          className={`flex-1 py-2 text-xs font-bold rounded-xl transition ${
+            activeTab === 'inventory' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'bg-slate-100 text-slate-600'
+          }`}
+        >
+          📦 المخزون والمنتجات
+        </button>
+        <button
+          onClick={() => setActiveTab('history')}
+          className={`flex-1 py-2 text-xs font-bold rounded-xl transition ${
+            activeTab === 'history' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'bg-slate-100 text-slate-600'
+          }`}
+        >
+          📜 الأرشيف
+        </button>
+      </div>
+
+      {/* Main Content Layout */}
+      <main className="max-w-7xl mx-auto p-3 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        {/* Cart Section: يظهر دائمًا في الشاشات الكبيرة، وفي الهواتف حسب التبويب النشط */}
+        <div className={`lg:col-span-5 lg:block ${activeTab === 'cart' ? 'block' : 'hidden'}`}>
+          <div className="lg:sticky lg:top-24">
+            <Cart
+              cart={cart}
+              products={products}
+              addToCart={addToCart}
+              updateCartQuantity={updateCartQuantity}
+              removeFromCart={removeFromCart}
+              handleCheckout={handleCheckout}
+              loadingCheckout={loadingCheckout}
+            />
+          </div>
         </div>
 
-        {/* Right Side: Inventory, Form & Sales Archive */}
-        <div className="lg:col-span-7 space-y-6">
+        {/* Inventory & Form Section */}
+        <div className={`lg:col-span-7 space-y-6 ${activeTab === 'inventory' ? 'block' : activeTab === 'cart' ? 'hidden lg:block' : 'hidden'}`}>
           <Inventory products={products} addToCart={addToCart} />
-          
-          {/* 📜 أرشيف الفواتير المباعة */}
-          <SalesHistory
-            DATABASE_ID={DATABASE_ID}
-            SALES_COLLECTION_ID={SALES_COLLECTION_ID}
-            refreshTrigger={salesRefresh}
-          />
-
           <ProductForm
             DATABASE_ID={DATABASE_ID}
             COLLECTION_ID={PRODUCTS_COLLECTION_ID}
             onProductAdded={fetchProducts}
           />
         </div>
+
+        {/* History Section */}
+        <div className={`lg:col-span-7 lg:col-start-6 space-y-6 ${activeTab === 'history' ? 'block' : 'hidden'}`}>
+          <SalesHistory
+            DATABASE_ID={DATABASE_ID}
+            SALES_COLLECTION_ID={SALES_COLLECTION_ID}
+            refreshTrigger={salesRefresh}
+          />
+        </div>
+
       </main>
     </div>
   );
